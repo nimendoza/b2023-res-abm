@@ -90,7 +90,7 @@ class Subject:
         reasons             = list(
             qualification[1]
                 for qualification in qualifications
-                    if qualification[0] is True
+                    if qualification[0] is False
         )
 
         section_qualified = list[bool]()
@@ -213,7 +213,7 @@ class Section:
         reasons        = list[str](
             item[1]
                 for item in qualifications
-                    if item[0] is True
+                    if item[0] is False
         )
         qualified      = all(item[0] for item in qualifications)
         return qualified, reasons
