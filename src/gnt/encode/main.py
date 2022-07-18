@@ -73,6 +73,7 @@ class EncodeAgent:
                 data = self.xlsx(path, sheet)
                 
                 #  TODO: Encode grade 12 students' groups
+                raise NotImplementedError()
 
         data     = self.xlsx(path, src.syp.g12.constants.STR)
         students = list()
