@@ -15,3 +15,6 @@ ELC = 'STE elective'
 
 MTH = 'Math level'
 '''Math level'''
+
+CAT = 'Category'
+'''Category'''

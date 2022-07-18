@@ -1,6 +1,7 @@
 from src.cls.constants import *
 
 from src.cls.main import Subject
+from src.cls.main import Category
 
 STR = 'Grade 11'
 INT = 11
@@ -18,5 +19,6 @@ RANKED = {
 NANKED = {
     ASA: list[Subject](),
     BLK: list[Subject](),
-    RES: list[Subject]()
+    RES: list[Subject](),
+    CAT: list[Category]()
 }
