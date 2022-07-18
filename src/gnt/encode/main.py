@@ -79,3 +79,13 @@ class EncodeAgent:
 
         #  TODO: Encode grade 12 students' data
         raise NotImplementedError()
+
+    def reset(self, grade_level: int = None) -> None:
+        match grade_level:
+            case None:
+                G11.__clear_subjects__()
+                G12.__clear_subjects__()
+            case 11:
+                G11.__clear_subjects__()
+            case 12:
+                G12.__clear_subjects__()

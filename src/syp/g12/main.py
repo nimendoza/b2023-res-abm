@@ -19,6 +19,12 @@ class G12(Student):
         )
 
         self.g11 = G11('12-{}'.format(self.id))
+        
+    def __clear_subjects__() -> None:
+        for type in RANKED:
+            RANKED[type].clear()
+        for type in NANKED:
+            NANKED[type].clear()
 
     def default_ranking(self, type: str) -> None:
         self.frank.clear(type)

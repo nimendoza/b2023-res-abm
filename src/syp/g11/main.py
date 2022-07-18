@@ -16,6 +16,12 @@ class G11(Student):
             shift,
             list(RANKED.keys())
         )
+
+    def __clear_subjects__() -> None:
+        for type in RANKED:
+            RANKED[type].clear()
+        for type in NANKED:
+            NANKED[type].clear()
     
     def default_ranking(self, type: str) -> None:
         self.frank.clear(type)
