@@ -72,4 +72,11 @@ class WriterAgent:
         workbook.close()
         return name_template.format(index)
 
+    def get_sheetnames(self, path: str) -> list[str]:
+        workbook   = load_workbook(path)
+        sheetnames = list(workbook.sheetnames)
+        workbook.close()
+        return sheetnames
+
+
 writer_agent = WriterAgent()
