@@ -78,5 +78,19 @@ class WriterAgent:
         workbook.close()
         return sheetnames
 
+    def is_sheet_present(
+        self,
+        path:  str,
+        sheet: str
+    ) -> bool:
+        workbook = load_workbook(
+            filename=path,
+            data_only=True
+        )
+        for sheet_name in workbook.sheetnames:
+            if sheet_name == sheet:
+                return True
+        return False
+
 
 writer_agent = WriterAgent()

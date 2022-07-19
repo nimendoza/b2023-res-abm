@@ -13,10 +13,7 @@ from src.cls.main       import Group
 
 
 class EncodeAgent:
-    def __init__(
-        self,
-        path: str
-    ) -> None:
+    def subjects(self, path: str) -> None:
         subjects   = dict[str, Subject]()
         categories = set[Category]()
 
@@ -44,20 +41,6 @@ class EncodeAgent:
             data.append(line)
         workbook.close()
         return data
-
-    def is_sheet_present(
-        self,
-        path:  str,
-        sheet: str
-    ) -> bool:
-        workbook = load_workbook(
-            filename=path,
-            data_only=True
-        )
-        for sheet_name in workbook.sheetnames:
-            if sheet_name == sheet:
-                return True
-        return False
 
     def g11(self, path: str) -> list[G11]:
         data     = self.xlsx(path, src.syp.g11.constants.STR)
