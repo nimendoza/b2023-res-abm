@@ -2,12 +2,32 @@ from __future__        import annotations
 from src.cls.constants import INF
 
 
+class Capacity:
+    def __init__(
+        self,
+        minimum: int,
+        ideal:   int,
+        maximum: int,
+        filled:  int = int()
+    ) -> None:
+        self.minimum = minimum
+        self.ideal   = ideal
+        self.maximum = maximum
+        self.filled  = filled
+    
+    def __repr__(self) -> str:
+        return '{}/{}'.format(
+            self.filled,
+            self.maximum
+        )
+
+
 class Subject:
     def __init__(
         self,
         name:              str,
         level:             int,
-        capacity:          Capacity,
+        capacity:          Capacity            = Capacity(0, 0, 0, 0),
         repeatable:        bool                = bool(),
         sections:          set[Section]        = set(),
         prerequisites:     set[tuple[Subject]] = set(),
@@ -120,26 +140,6 @@ class Subject:
             student.add_subject(self)
             student.add_section(section)
         return qualified, reasons
-
-
-class Capacity:
-    def __init__(
-        self,
-        minimum: int,
-        ideal:   int,
-        maximum: int,
-        filled:  int = int()
-    ) -> None:
-        self.minimum = minimum
-        self.ideal   = ideal
-        self.maximum = maximum
-        self.filled  = filled
-    
-    def __repr__(self) -> str:
-        return '{}/{}'.format(
-            self.filled,
-            self.maximum
-        )
 
 
 class Section:
@@ -283,12 +283,14 @@ class Student:
 class Shift:
     def __init__(
         self,
+        name:       str      = None,
         partitions: set[str] = set()
     ) -> None:
+        self.name       = name
         self.partitions = partitions
     
     def __repr__(self) -> str:
-        return ''.join(sorted(self.partitions))
+        return ''.join(sorted(self.partitions)) if self.name is None else self.name
 
     def add_partition(self, partition: str) -> None:
         self.partitions.add(partition)
