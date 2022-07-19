@@ -14,6 +14,9 @@ from src.cls.main       import Group
 
 class EncodeAgent:
     def subjects(self, path: str) -> None:
+        '''Resets subjects, and then encodes'''
+        self.__reset__()
+
         subjects   = dict[str, Subject]()
         categories = set[Category]()
 
@@ -64,7 +67,7 @@ class EncodeAgent:
         #  TODO: Encode grade 12 students' data
         raise NotImplementedError()
 
-    def reset(self, grade_level: int = None) -> None:
+    def __reset__(self, grade_level: int = None) -> None:
         match grade_level:
             case None:
                 G11.__clear_subjects__()
@@ -73,3 +76,6 @@ class EncodeAgent:
                 G11.__clear_subjects__()
             case 12:
                 G12.__clear_subjects__()
+
+
+encode_agent = EncodeAgent()
