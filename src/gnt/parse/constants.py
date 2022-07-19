@@ -1,3 +1,9 @@
 TERMINAL = True
 
-SUBJECTS_PATH = 'input\\Subject Test Data.xlsx'
+SUBJECT_DESC = 'Subject desciprtion',
+REQUEST      = 'Request description'
+
+PATHS = {
+    SUBJECT_DESC: 'src\\txt\\subject_file.txt',
+    REQUEST:      'src\\txt\\request.txt'
+}

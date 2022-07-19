@@ -1,0 +1,2 @@
+Description of the Subjects file to encode:
+    1. Please make sure that it is formatted to adhere to 'input\Subject Test Data Template.xlsx'

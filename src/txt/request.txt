@@ -1,0 +1,7 @@
+Legend for: Request
+    GENERATE    [Deprecated] Generate test data
+    VALIDATE    Validate students' data
+    ANALYZE     Analyze students' data
+    PLOT        Plot courses to sections
+    ENLIST      Enlist students to sections
+    CHECK       Check statistics for student enlistment
