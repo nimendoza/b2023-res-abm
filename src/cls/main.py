@@ -193,15 +193,20 @@ class Section:
             '{} classmates are inappropriate for {}'.format(self, student)
         ]
         ok_groupmates = [
-            all(
-                any(
-                    groupmate in self.students or groupmate.section[self.subject.type] is None
-                        for groupmate in group
-                )
-                    for group in student.groups
-            ),
-            '{} does not have the same section as their groupmates'.format(student)
+            True,
+            'Required groupmates of {} are not in the same shift or section'.format(student)
         ]
+        for group in student.groups:
+            if group.required:
+                ok_groupmates[0] = ok_groupmates[0] and all(
+                    groupmate.shift in {self.shift, None}
+                        for groupmate in group.students
+                )
+                if group.parent == self.subject:
+                    ok_groupmates[0] = ok_groupmates[0] and all(
+                        groupmate.sections[self.subject.type] in {self, None}
+                            for groupmate in group.students
+                    )
 
         qualifications = [
             has_slots,
