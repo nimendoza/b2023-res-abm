@@ -1,3 +1,5 @@
+INF = int(1e9)
+
 ASA = 'ASA'
 '''ASA'''
 

@@ -1,8 +1,5 @@
-from __future__ import annotations
-
-#  GLOBALS
-INF = int(1e9)
-#  -------
+from __future__        import annotations
+from src.cls.constants import INF
 
 
 class Subject:
