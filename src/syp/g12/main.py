@@ -9,7 +9,7 @@ class G12(Student):
     def __init__(
         self,
         id:    str,
-        shift: Shift
+        shift: Shift = None
     ) -> None:
         super(G12, self).__init__(
             id,

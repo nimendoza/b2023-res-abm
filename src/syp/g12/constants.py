@@ -3,7 +3,7 @@ from src.cls.constants import *
 from src.cls.main import Subject
 from src.cls.main import Category
 
-GRP = 'Group'
+GRP = 'group'
 STR = 'Grade 12'
 INT = 12
 
