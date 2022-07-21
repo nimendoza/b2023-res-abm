@@ -574,6 +574,15 @@ class Student:
             self.add_subject(type, self.rankings.final.get(type, index))
             self.add_attends(self.rankings.final.get(type, index))
 
+    def default_ranking(
+        self, 
+        type: str, 
+        subjects: list[Subject]
+    ) -> None:
+        self.rankings.final.clear(type)
+        for subject in subjects:
+            self.rankings.final.add(type, subject)
+
 
 class Group:
     def __init__(
