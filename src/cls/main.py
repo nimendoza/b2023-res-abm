@@ -58,6 +58,9 @@ class Shift:
     def partitions(self) -> set[str]:
         return self._partitions
 
+    def add_partition(self, value: str) -> None:
+        self._partitions.add(value)
+
 
 class ParallelSession:
     def __init__(
@@ -229,11 +232,10 @@ class Section:
         return self._parent
 
     @property
-    def students(self) -> set[Student]:
+    def student(self) -> set[Student]:
         return self._students
 
-    @students.setter
-    def students(self, student: Student) -> tuple[bool, str | None]:
+    def add_student(self, student: Student) -> tuple[bool, str | None]:
         def ok_groupmates(student: Student) -> bool:
             for group in student.groups:
                 if group.required:
@@ -261,7 +263,7 @@ class Section:
             self._students.add(student)
             self.capacity.accept(1)
 
-            student.sections(self.parent, self)
+            student.add_section(self.parent, self)
             return True, None
 
 
@@ -294,8 +296,7 @@ class Category:
     def students(self) -> set[Student]:
         return self._students
 
-    @students.setter
-    def students(self, student: Student) -> tuple[bool, str | None]:
+    def add_student(self, student: Student) -> tuple[bool, str | None]:
         '''Returns whether the student was added and any reason why the student wasn't added, if applicable'''
         if self.capacity.available <= 0:
             return False, '{} has been filled'.format(self)
@@ -303,7 +304,7 @@ class Category:
             self._students.add(student)
             self.capacity.accept(1)
 
-            student.categories.add(self)
+            student.categories[str(self)] = self
             return True, None
 
 
@@ -363,38 +364,35 @@ class Student:
     def subjects(self) -> dict[str, Subject]:
         return self._subjects
 
-    @subjects.setter
-    def subjects(
+    def add_subject(
         self,
         type:    str,
         subject: Subject = None
     ) -> None:
         self._subjects[type] = subject
         if subject is not None:
-            self.sections(subject)
-            self.attends(subject)
+            self.add_section(subject)
+            self.add_attends(subject)
 
     @property
     def categories(self) -> dict[str, Category]:
         return self._categories
 
-    @categories.setter
-    def categories(
+    def add_category(
         self,
         type: str,
         category: Category = None
     ) -> None:
         self._categories[type] = category
         if category is not None:
-            self.sections(category)
-            self.attends(category)
+            self.add_section(category)
+            self.add_attends(category)
 
     @property
     def sections(self) -> dict[Subject | Category, Section]:
         return self._sections
 
-    @sections.setter
-    def sections(
+    def add_section(
         self, 
         parent: Subject | Category, 
         section: Section = None
@@ -409,16 +407,14 @@ class Student:
     def groups(self) -> dict[Subject | Category, Group]:
         return self._groups
 
-    @groups.setter
-    def groups(self, parent: Subject | Category, group: Group) -> None:
+    def add_group(self, parent: Subject | Category, group: Group) -> None:
         self._groups[parent] = group
 
     @property
     def prerequisites(self) -> set[Student]:
         return self._prerequisites
 
-    @prerequisites.setter
-    def prerequisites(self, student: Student) -> None:
+    def add_prerequisite(self, student: Student) -> None:
         if student == self:
             raise Exception()
         elif student in self.not_alongside:
@@ -430,8 +426,7 @@ class Student:
     def not_alongside(self) -> set[Student]:
         return self._not_alongside
 
-    @not_alongside.setter
-    def not_alongside(self, student: Student) -> None:
+    def add_not_alongside(self, student: Student) -> None:
         if student == self:
             raise Exception()
         elif student in self.prerequisites:
@@ -443,18 +438,16 @@ class Student:
     def attends(self) -> set[Subject | Category]:
         return self._attends
 
-    @attends.setter
-    def attends(self, value: Subject | Category) -> None:
+    def add_attends(self, value: Subject | Category) -> None:
         self._attends.add(value)
-        self.sections(value)
+        self.add_section(value)
 
     @property
     def taken(self) -> set[Subject | Category]:
         return self._previous.attends
 
-    @taken.setter
-    def taken(self, object: Subject | Category) -> None:
-        self._previous.attends(object)
+    def add_taken(self, object: Subject | Category) -> None:
+        self._previous.add_attends(object)
 
     @property
     def has_enlisted_level(self, level: int) -> bool:
@@ -479,15 +472,15 @@ class Student:
         type:  str,
         index: int = 0
     ) -> None:
-        qualified, reason = self.rankings.final.get(type, index).students(self)
+        qualified, reason = self.rankings.final.get(type, index).add_student(self)
         if not qualified:
             self.rankings.final.reject(
                 self.rankings.final.get(type, index),
                 reason
             )
         else:
-            self.subjects(type, self.rankings.final.get(type, index))
-            self.attends(self.rankings.final.get(type, index))
+            self.add_subject(type, self.rankings.final.get(type, index))
+            self.add_attends(self.rankings.final.get(type, index))
 
 
 class Group:
@@ -512,8 +505,7 @@ class Group:
     def students(self) -> set[Student]:
         return self._students
 
-    @students.setter
-    def students(self, student: Student) -> bool:
+    def add_students(self, student: Student) -> bool:
         def ok_groupmates(student: Student):
             for member in self.students:
                 if member.shift not in {None, student.shift}:
@@ -529,20 +521,21 @@ class Group:
         else:
             self._students.add(student)
             self.capacity.accept(1)
-            student.groups(self.parent, self)
+            student.add_group(self.parent, self)
 
 
 class Subject:
     def __init__(
         self,
         name:              str,
-        level:             int                 = None,
-        capacity:          Capacity            = Capacity(0, 0, 0),
-        repeatable:        bool                = bool(),
-        sections:          set[Section]             = set(),
+        level:             int                            = None,
+        capacity:          Capacity                       = Capacity(0, 0, 0),
+        repeatable:        bool                           = bool(),
+        sections:          set[Section]                   = set(),
         prerequisites:     set[tuple[Subject | Category]] = set(),
         not_alongside:     set[Subject | Category]        = set(),
-        max_group_members: int                 = int()
+        max_group_members: int                            = int(),
+        teaches:           set[int]                       = set()
     ) -> None:
         self._name              = name
         self._level             = level
@@ -551,6 +544,7 @@ class Subject:
         self._prerequisites     = prerequisites
         self._not_alongside     = not_alongside
         self._max_group_members = max_group_members
+        self._teaches           = teaches
 
         self.capacity = capacity
     
@@ -576,8 +570,7 @@ class Subject:
     def sections(self) -> set[Section]:
         return self._sections
 
-    @sections.setter
-    def sections(self, section: Section) -> None:
+    def add_section(self, section: Section) -> None:
         '''Add a section'''
         if section.parent != self:
             raise Exception()
@@ -589,8 +582,7 @@ class Subject:
     def prerequisites(self) -> set[tuple[Subject | Category]]:
         return self._prerequisites
 
-    @prerequisites.setter
-    def prerequisites(self, objects: tuple[Subject | Category]) -> None:
+    def add_prerequisites(self, objects: tuple[Subject | Category]) -> None:
         if self in objects:
             raise Exception()
         elif len(set(objects).intersection(self.not_alongside)) > 0:
@@ -602,8 +594,7 @@ class Subject:
     def not_alongside(self) -> set[Subject | Category]:
         return self._not_alongside
 
-    @not_alongside.setter
-    def not_alongside(self, object: Subject | Category) -> None:
+    def add_not_alongside(self, object: Subject | Category) -> None:
         if self == object:
             raise Exception()
         elif any(
@@ -615,11 +606,10 @@ class Subject:
             self._not_alongside.add(object)
 
     @property
-    def students(self) -> set[Student]:
+    def student(self) -> set[Student]:
         return self._students
 
-    @students.setter
-    def students(self, student: Student) -> tuple[bool, str | None]:
+    def add_student(self, student: Student) -> tuple[bool, str | None]:
         def ok_prerequisites(student: Student) -> bool:
             pass
 
@@ -631,8 +621,15 @@ class Subject:
             return False, 'Incompatible with subject'
         else:
             for section in self.sections:
-                qualified, reason = section.students(student)
+                qualified, reason = section.add_student(student)
                 if qualified:
                     self.capacity.accept(1)
                     return True, None
             return False, 'Incompatible with sections'
+
+    @property
+    def teaches(self) -> set[int]:
+        return self._teaches
+    
+    def add_teaches(self, grade_level: int) -> None:
+        self._teaches.add(grade_level)
