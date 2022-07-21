@@ -1,107 +1,42 @@
-import src.syp.g11.constants
-import src.syp.g12.constants
-
 from src.gnt.encode.constants import *
 
-from openpyxl           import load_workbook
-from src.cls.main       import Subject
-from src.cls.main       import Category
-from src.syp.g11.main   import G11
-from src.syp.g12.main   import G12
-from src.gnt.write.main import writer_agent
-from src.cls.main       import Group
-from src.cls.main       import Section
-from src.cls.main       import Shift
-from src.cls.main       import ParallelSession
-from src.cls.main       import Capacity
-
+from src.cls.main import Subject
+from src.cls.main import Category
+from src.cls.main import Shift
+from src.cls.main import Section
+from src.cls.main import ParallelSession
+from src.cls.main import Capacity
+from openpyxl import load_workbook
 
 class EncodeAgent:
-    def subjects(self, path: str) -> None:
-        '''Resets subjects, and then encodes'''
-        self.__reset__()
+    def __init__(self) -> None:
+        self.subjects   = dict[str, list[list[tuple[int, bool, str]] | Subject]]()
+        self.categories = dict[str, Category]()
+        self.shifts     = dict[str, Shift]()
 
-        subjects   = dict[str, Subject]()
-        categories = set[Category]()
-        shifts     = dict[str, Shift]()
+        self.sorted_subjects = dict[int, dict[bool, dict[str, list[Subject]]]]()
 
-        cls = self.xlsx(path, CLASSIFICATION)
-        for r in range(2, len(cls)):
-            name  = cls[r][0]
-            level = int() if not cls[r][1].isdigit() else int(cls[r][1])
-            
-            is_category = cls[r][2] == 'Y'
-            if is_category:
-                category = Category(name)
-                categories.add(category)
-            else:
-                subject = Subject(name, level)
-                subjects[subject.name] = subject
-                for c in range(3, len(cls[r]), 2):
-                    grade_level    = cls[1][c]
-                    classification = cls[1][c + 1]
-                    if 'Y' in cls[r][c:c + 1]:
-                        match grade_level:
-                            case src.syp.g11.constants.STR:
-                                src.syp.g11.constants.RANKED[classification].append(subject)
-                            case src.syp.g12.constants.STR:
-                                src.syp.g12.constants.RANKED[classification].append(subject)
+    def reset(self, grade_level: int = None) -> None:
+        if grade_level is None:
+            self.subjects.clear()
+            self.categories.clear()
+        else:
+            self.subjects[grade_level].clear()
+            self.categories[grade_level].clear()
+        self.sorted_subjects.clear()
+        self.shifts.clear()
 
-        prq = self.xlsx(path, PREREQUISITES)
-        for r in range(1, len(prq)):
-            name = prq[r][0]
-            count = int(prq[r][1])
-            for c in range(2, 2 + count):
-                pre = tuple[Subject](
-                    subjects[subject]
-                        for subject in prq[r][c].split(DELIMITER)
-                )
-                subjects[name].add_prerequisite(pre)
-
-        nas = self.xlsx(path, NOT_ALONGSIDE)
-        for r in range(1, len(nas)):
-            name = nas[r][0]
-            count = int(nas[r][1])
-            for c in range(2, 2 + count):
-                subjects[name].add_not_alongside(subjects[nas[r][c]])
-
-        sft = self.xlsx(path, SHIFTS)
-        for r in range(1, len(sft)):
-            name         = sft[r][0]
-            shift        = Shift(name=name)
-            shifts[name] = shift
-
-            count = int(sft[r][1])
-            for c in range(2, 2 + count):
-                part = sft[r][c]
-                shift.add_partition(part)
-
-        scs = self.xlsx(path, SECTIONS)
-        for r in range(2, len(scs)):
-            name = scs[r][0]
-            cont = int(scs[r][1])
-            for c in range(2, 2 + cont * 6, 6):
-                typ =     scs[r][c]
-                ind = int(scs[r][c + 1]) if scs[r][c + 1] != 'None' else int()
-                sft =     scs[r][c + 2]
-                pss = ParallelSession(
-                    shifts[sft],
-                    typ,
-                    ind
-                )
-
-                min = int(scs[r][c + 3])
-                idl = int(scs[r][c + 4])
-                max = int(scs[r][c + 5])
-                cap = Capacity(min, idl, max)
-
-                subjects[name].add_section(Section(
-                    shifts[sft],
-                    pss,
-                    cap,
-                    subjects[name]
-                ))
-
+    def sort(self) -> None:
+        for data, subject in self.subjects.values():
+            grade_level, ranked, type = data
+            if grade_level not in self.sorted_subjects:
+                self.sorted_subjects[grade_level] = dict[bool, dict[str, list[Subject]]]()
+            if ranked not in self.sorted_subjects[grade_level]:
+                self.sorted_subjects[grade_level][ranked] = dict[str, list[Subject]]()
+            if type not in self.sorted_subjects[grade_level][ranked]:
+                self.sorted_subjects[grade_level][ranked][type] = list[Subject]()
+            self.sorted_subjects[grade_level][ranked][type].append(subject)
+        
     def xlsx(
         self,
         path:  str,
@@ -120,41 +55,103 @@ class EncodeAgent:
                     line.append(str(int(cell.value)))
                 else:
                     line.append(str(cell.value))
-            data.append(line)
+            if not all(
+                cell == 'None'
+                    for cell in line
+            ):
+                data.append(line)
         workbook.close()
         return data
 
-    def g11(self, path: str) -> list[G11]:
-        data     = self.xlsx(path, src.syp.g11.constants.STR)
-        students = list()
+    def find(self, name: str) -> Subject | Category:
+        if name in self.categories:
+            return self.categories[name]
+        else:
+            return self.subjects[name][1]
 
-        #  TODO: Encode grade 11 students' data
-        raise NotImplementedError()
+    def encode_subjects(self, path: str, reset: bool = True) -> None:
+        if reset:
+            self.reset()
 
-    def g12(self, path: str) -> list[G12]:
-        groups = dict[str, Group]()
-        for sheet in writer_agent.get_sheetnames(path):
-            if sheet.find(src.syp.g12.constants.GRP) != -1:
-                data = self.xlsx(path, sheet)
-                
-                #  TODO: Encode grade 12 students' groups
-                raise NotImplementedError()
+        data = self.xlsx(path, SHIFTS)
+        for r in range(1, len(data)):
+            name  = data[r][0]
+            shift = Shift(name)
+            for c in range(2, 2 + int(data[r][1])):
+                shift.add_partition(data[r][c])
+            self.shifts[name] = shift
 
-        data     = self.xlsx(path, src.syp.g12.constants.STR)
-        students = list()
+        data = self.xlsx(path, CLASSIFICATION)
+        for r in range(2, len(data)):
+            name              = data[r][0]
+            max_group_members = None if not data[r][2].isdigit() else int(data[r][2])
+            if data[r][3].upper() == 'Y':
+                category = Category(
+                    name=name,
+                    max_group_members=max_group_members
+                )
+                self.categories[name] = category
+            else:
+                level   = None if not data[r][1].isdigit() else int(data[r][1])
+                subject = Subject(
+                    name=name,
+                    level=level,
+                    max_group_members=max_group_members
+                )
+                for c in range(4, len(data[r]), 3):
+                    grade_level = data[1][c]
+                    ranked      = data[1][c + 1].upper() == 'Y'
+                    type        = data[1][c + 2]
+                    is_type     = any(
+                        item.upper() == 'Y'
+                            for item in data[r][c:c + 3]
+                    )
+                    if is_type:
+                        subject.add_teaches(GRADE_LEVELS[grade_level])
+                        if str(subject) not in self.subjects:
+                            self.subjects[str(subject)] = [[(GRADE_LEVELS[grade_level], ranked, type)], subject]
+                        else:
+                            self.subjects[str(subject)][0].append((GRADE_LEVELS[grade_level], ranked, type))
+        
+        data = self.xlsx(path, PREREQUISITES)
+        for r in range(1, len(data)):
+            object = self.find(data[r][0])
+            for c in range(2, 2 + int(data[r][1])):
+                prerequisite = tuple(
+                    self.find(name)
+                        for name in data[r][c].split(DELIMITER)
+                )
+                object.add_prerequisites(prerequisite)
 
-        #  TODO: Encode grade 12 students' data
-        raise NotImplementedError()
+        data = self.xlsx(path, NOT_ALONGSIDE)
+        for r in range(1, len(data)):
+            object = self.find(data[r][0])
+            for c in range(2, 2 + int(data[r][1])):
+                not_alongside = self.find(data[r][c])
+                object.add_not_alongside(not_alongside)
 
-    def __reset__(self, grade_level: int = None) -> None:
-        match grade_level:
-            case None:
-                G11.__clear_subjects__()
-                G12.__clear_subjects__()
-            case 11:
-                G11.__clear_subjects__()
-            case 12:
-                G12.__clear_subjects__()
+        data = self.xlsx(path, SECTIONS)
+        for r in range(2, len(data)):
+            object = self.find(data[r][0])
+            for c in range(2, 2 + int(data[r][1]), 6):
+                shift = self.shifts[data[r][c + 2]]
+                index = None if not data[r][c + 1].isdigit() else int(data[r][c + 1])
+                object.add_section(Section(
+                    shift=shift,
+                    parallel_session=ParallelSession(
+                        shift=shift,
+                        partition=data[r][c],
+                        index=index
+                    ),
+                    capacity=Capacity(
+                        minimum=int(data[r][c + 3]),
+                        ideal=int(data[r][c + 4]),
+                        maximum=int(data[r][c + 5])
+                    ),
+                    parent=object
+                ))
+
+        self.sort()
 
 
 encode_agent = EncodeAgent()
