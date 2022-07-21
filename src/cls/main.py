@@ -16,130 +16,174 @@ class Capacity:
         self.filled  = filled
     
     def __repr__(self) -> str:
-        return '{}/{}'.format(
-            self.filled,
-            self.maximum
-        )
+        return '{}/{}'.format(self.filled, self.maximum)
+        
+    @property
+    def available(self) -> int:
+        return self.maximum - self.filled
+
+    def accept(self, value: int) -> None:
+        if self.filled + value <= self.maximum:
+            raise Exception()
+        else:
+            self.filled += value
+
+    def increase(self, other: Capacity) -> None:
+        self.minimum += other.minimum
+        self.ideal   += other.ideal
+        self.maximum += other.maximum
+        self.accept(other.filled)
 
 
-class Subject:
+class Shift:
     def __init__(
         self,
-        name:              str,
-        level:             int,
-        capacity:          Capacity            = Capacity(0, 0, 0, 0),
-        repeatable:        bool                = bool(),
-        sections:          set[Section]        = set(),
-        prerequisites:     set[tuple[Subject]] = set(),
-        not_alongside:     set[Subject]        = set(),
-        max_group_members: int                 = int()
+        id:         str      = None,
+        partitions: set[str] = set()
     ) -> None:
-        self.name              = name
-        self.level             = level
-        self.capacity          = capacity
-        self.sections          = sections
-        self.repeatable        = repeatable
-        self.prerequisites     = prerequisites
-        self.not_alongside     = not_alongside
-        self.max_group_members = max_group_members
+        self._id         = id
+        self._partitions = partitions
     
     def __repr__(self) -> str:
-        return '{}{}'.format(
-            self.name,
-            ' Level {}'.format(self.level)
-                if self.level != int()
-                else ''
-        )
+        return self.id
 
-    def add_prerequisite(self, subjects: tuple[Subject]) -> None:
-        if self not in subjects:
-            self.prerequisites.add(subjects)
+    @property
+    def id(self) -> str:
+        if self._id is None:
+            return ''.join(self.partitions)
         else:
-            raise NotImplementedError()
+            return self._id
 
-    def add_not_alongside(self, subject: Subject) -> None:
-        if subject != self:
-            self.not_alongside.add(subject)
+    @property
+    def partitions(self) -> set[str]:
+        return self._partitions
+
+
+class ParallelSession:
+    def __init__(
+        self,
+        shift:     Shift,
+        partition: str,
+        index:     int   = None,
+        id:        str   = None
+    ) -> None:
+        self._shift     = shift
+        self._partition = partition
+        assert self.partition in self.shift.partitions
+
+        self._index = index
+        self._id    = id
+    
+    def __repr__(self) -> str:
+        raise NotImplementedError()
+
+    @property
+    def shift(self) -> Shift:
+        return self._shift
+
+    @property
+    def partition(self) -> str:
+        return self._partition
+
+    @property
+    def index(self) -> str:
+        if self._index is None:
+            return ''
         else:
-            raise NotImplementedError()
+            return str(self._index)
 
-    def add_section(self, section: Section) -> None:
-        if section.subject == self:
-            self.sections.add(section)
-            self.capacity.add(section.capacity)
+    @property
+    def id(self) -> str:
+        if self._id is None:
+            return ''.join([self.partition, self.index])
         else:
-            raise NotImplementedError()
+            return self._id
 
-    def inspect_student(self, student: Student) -> tuple[bool, list[str], Section | None]:
-        ok_capacity      = [
-            self.capacity.filled < self.capacity.maximum,
-            '{} has full capacity'.format(self)
-        ]
-        taken_before     = [
-            self in student.taken() and not self.repeatable,
-            '{} has taken {} before'.format(student, self)
-        ]
-        ok_prerequisites = [
-            all(
-                len(set(subjects).intersection(student.taken())) > 0
-                    for subjects in self.prerequisites
-            ),
-            '{} did not meet prerequisites of {}'.format(student, self)
-        ]
-        ok_not_alongside = [
-            all(
-                subject not in student.takes()
-                    for subject in self.not_alongside
-            ),
-            '{} is taking a subject not alongside for {}'.format(student, self)
-        ]
 
-        qualifications      = [
-            ok_capacity,
-            taken_before,
-            ok_prerequisites,
-            ok_not_alongside
-        ]
-        initially_qualified = all(
-            qualification[0]
-                for qualification in qualifications
+class Rank:
+    def __init__(
+        self,
+        id:    str,
+        types: list[str]
+    ) -> None:
+        self._id    = 'RANK-{}'.format(id)
+        self._types = set(types)
+
+        self._lst = dict(
+            (type, list[Subject]())
+                for type in self.types
         )
-        reasons             = list(
-            qualification[1]
-                for qualification in qualifications
-                    if qualification[0] is False
+        self._set = dict(
+            (type, set[Subject]())
+                for type in self.types
         )
-
-        section_qualified = list[bool]()
-        official_sections = list()
-        if initially_qualified:
-            for section in self.sections:
-                qualified, section_reasons = section.inspect_student(student)
-                section_qualified.append(qualified)
-                if not qualified:
-                    for reason in section_reasons:
-                        reasons.append('{}: {}'.format(section, reason))
-                else:
-                    official_sections.append(section)
-        official_sections.sort(
-            key=lambda x: x.capacity.maximum - x.capacity.filled,
-            reverse=True
+        self._rsn = dict(
+            (type, list[str]())
+                for type in self.types
         )
-        
-        section_qualified = any(section_qualified)
-        if not section_qualified:
-                reasons.append('No section/s of {} can allot'.format(self))
-        return initially_qualified and section_qualified, reasons, official_sections[0]
+    
+    def __repr__(self) -> str:
+        return self.id
 
-    def add_student(self, student: Student) -> tuple[bool, list[str]]:
-        qualified, reasons, section = self.inspect_student(student)
-        if qualified:
-            self.capacity.filled += 1
-            section.add_student(student)
-            
-            student.add_subject(self)
-            student.add_section(section)
-        return qualified, reasons
+    @property
+    def id(self) -> str:
+        return self._id
+
+    @property
+    def types(self) -> set[str]:
+        return self._types
+
+    def add(
+        self,
+        type:    str,
+        subject: Subject
+    ) -> None:
+        if subject not in self._set[type]:
+            self._lst[type].append(subject)
+            self._set[type].add(subject)
+
+    def get(
+        self,
+        type:  str,
+        index: int
+    ) -> Subject:
+        return self._lst[type][index]
+
+    def all(self, type: str) -> list[Subject]:
+        return self._lst[type]
+
+    def reject(
+        self,
+        type:    str,
+        subject: Subject,
+        reason:  str
+    ) -> None:
+        self._lst[type].remove(subject)
+        self._set[type].remove(subject)
+        self._rsn[type].append('{}: {}'.format(subject, reason))
+
+    def clear(self, type: str) -> None:
+        self._lst[type].clear()
+        self._set[type].clear()
+
+
+class Rankings:
+    def __init__(
+        self,
+        id:      str,
+        to_rank: list[str]
+    ) -> None:
+        self._id = 'RANKING-{}'.format(id)
+
+        self.initial = Rank('{}I'.format(id), to_rank)
+        self.final   = Rank('{}F'.format(id), to_rank)
+    
+    def __repr__(self) -> str:
+        return self.id
+
+    @property
+    def id(self) -> str:
+        return self._id
 
 
 class Section:
@@ -148,77 +192,119 @@ class Section:
         shift:            Shift,
         parallel_session: ParallelSession,
         capacity:         Capacity,
-        subject:          Subject,
-        students:         set[Student]     = set()
+        parent:           Subject | Category,
+        name:             str                 = None,
+        students:         set[Student]        = set()
     ) -> None:
-        self.shift = shift
+        self._shift            = shift
+        self._parallel_session = parallel_session
+        assert self.parallel_session.shift in self.shift.partitions
 
-        self.parallel_session = parallel_session
-        assert self.shift == self.parallel_session.shift
+        self._name     = name
+        self._parent   = parent
+        self._students = students
 
         self.capacity = capacity
-        self.subject  = subject
-        self.students = students
-
+    
     def __repr__(self) -> str:
-        return '{} {}'.format(
-            self.subject,
-            self.parallel_session
-        )
+        return self.name
 
-    def inspect_student(self, student: Student) -> tuple[bool, list[str]]:
-        has_slots     = [
-            self.capacity.filled < self.capacity.maximum,
-            '{} has no more slots available'.format(self)
-        ]
-        ok_shift      = [
-            student.shift in {None, self.shift},
-            '{} is not in the same shift as {}'.format(student, self)
-        ]
-        not_attending = [
-            any(
-                self.parallel_session not in student.attending,
-                student.attending[self.parallel_session] is None
-            ),
-            '{} is already attending a/an {} session'.format(student, self.parallel_session)
-        ]
-        ok_classmates = [
-            all(
-                len(self.students.intersection(student.not_alongside)) == 0,
-                self.students.issuperset(student.prerequisites)
-            ),
-            '{} classmates are inappropriate for {}'.format(self, student)
-        ]
-        ok_groupmates = [
-            True,
-            'Required groupmates of {} are not in the same shift or section'.format(student)
-        ]
-        for group in student.groups:
-            if group.required:
-                ok_groupmates[0] = ok_groupmates[0] and all(
-                    groupmate.shift in {self.shift, None}
-                        for groupmate in group.students
-                )
-                if group.parent == self.subject:
-                    ok_groupmates[0] = ok_groupmates[0] and all(
-                        groupmate.sections[self.subject.type] in {self, None}
-                            for groupmate in group.students
-                    )
+    @property
+    def name(self) -> str:
+        if self._name is None:
+            return '{} {}'.format(self.parent, self.parallel_session)
+        else:
+            return self._name
 
-        qualifications = [
-            has_slots,
-            ok_shift,
-            not_attending,
-            ok_classmates,
-            ok_groupmates
-        ]
-        reasons        = list[str](
-            item[1]
-                for item in qualifications
-                    if item[0] is False
-        )
-        qualified      = all(item[0] for item in qualifications)
-        return qualified, reasons
+    @property
+    def parallel_session(self) -> ParallelSession:
+        return self._parallel_session
+
+    @property
+    def shift(self) -> Shift:
+        return self._shift
+
+    @property
+    def parent(self) -> Subject | Category:
+        return self._parent
+
+    @property
+    def students(self) -> set[Student]:
+        return self._students
+
+    @students.setter
+    def students(self, student: Student) -> tuple[bool, str | None]:
+        def ok_groupmates(student: Student) -> bool:
+            for group in student.groups:
+                if group.required:
+                    if group.parent == self.parent:
+                        for member in group.students:
+                            if self.parent in member.attends and member.sections[self.parent] not in {self, None}:
+                                return False
+                    for member in group.students:
+                        if member.shift not in {self.shift, None}:
+                            return False
+
+        if self.capacity.available <= 0:
+            return False, 'Full'
+        elif student.shift not in {self.shift, None}:
+            return False, 'Incompatible shift'
+        elif student.sessions[self.parallel_session.partition] is not None:
+            return False, 'Already attending a parallel session'
+        elif len(self._students.intersection(student.not_alongside)) > 0:
+            return False, 'Incompatible classmate/s'
+        elif not self._students.issuperset(student.prerequisites):
+            return False, 'Prerequisite classmate/s not present'
+        elif not ok_groupmates(student):
+            return False, 'Incompatible with groupmates'
+        else:
+            self._students.add(student)
+            self.capacity.accept(1)
+
+            student.sections(self.parent, self)
+            return True, None
+
+
+class Category:
+    def __init__(
+        self,
+        name:              str,
+        capacity:          Capacity     = Capacity(0, INF, INF),
+        max_group_members: int          = int(),
+        students:          set[Student] = set()
+    ) -> None:
+        self._name              = name
+        self._max_group_members = max_group_members
+        self._students          = students
+
+        self.capacity = capacity
+    
+    def __repr__(self) -> str:
+        return self.name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def max_group_members(self) -> int:
+        return self._max_group_members
+
+    @property
+    def students(self) -> set[Student]:
+        return self._students
+
+    @students.setter
+    def students(self, student: Student) -> tuple[bool, str | None]:
+        '''Returns whether the student was added and any reason why the student wasn't added, if applicable'''
+        if self.capacity.available <= 0:
+            return False, '{} has been filled'.format(self)
+        else:
+            self._students.add(student)
+            self.capacity.accept(1)
+
+            student.categories.add(self)
+            return True, None
 
 
 class Student:
@@ -226,97 +312,182 @@ class Student:
         self,
         id:            str,
         level:         int,
-        shift:         Shift,
         to_rank:       list[str],
-        subjects:      dict[str, Subject | None] = dict(),
-        sections:      dict[str, Section | None] = dict(),
-        categories:    set[Category]             = set(),
-        groups:        set[Group]                = set(),
-        prerequisites: set[Student]              = set(),
-        not_alongside: set[Student]              = set()
+        shift:         Shift                                    = None,
+        subjects:      dict[str, Subject | None]                = dict(),
+        categories:    dict[str, Category | None]               = dict(),
+        sections:      dict[Subject | Category, Section | None] = dict(),
+        groups:        dict[Subject | Category, Group]          = dict(),
+        prerequisites: set[Student]                             = set(),
+        not_alongside: set[Student]                             = set(),
+        previous:      Student                                  = None
     ) -> None:
-        self.id            = id
-        self.level         = level
-        self.shift         = shift
-        self.to_rank       = to_rank
-        self.irank         = Rank('{}I'.format(self.id), self.to_rank)
-        self.frank         = Rank('{}F'.format(self.id), self.to_rank)
-        self.subjects      = subjects
-        self.sections      = sections
-        self.categories    = categories
-        self.groups        = groups
-        self.prerequisites = prerequisites
-        self.not_alongside = not_alongside
+        self._id            = id
+        self._level         = level
+        self._shift         = shift
+        self._to_rank       = to_rank
+        self._subjects      = subjects
+        self._categories    = categories
+        self._sections      = sections
+        self._groups        = groups
+        self._prerequisites = prerequisites
+        self._not_alongside = not_alongside
+        self._previous      = previous
+
+        self.rankings = Rankings(self.id, self.to_rank)
     
     def __repr__(self) -> str:
         return self.id
 
-    def taken(self) -> set[Subject]:
-        return set()
+    @property
+    def id(self) -> str:
+        return self._id
 
-    def takes(self) -> set[Subject]:
-        takes = set(
-            subject
-                for subject in self.subjects.values()
-                    if isinstance(subject, Subject)
-        )
-        return takes
+    @property
+    def to_rank(self) -> list[str]:
+        return self._to_rank
 
+    @property
+    def shift(self) -> Shift | None:
+        return self._shift
+
+    @shift.setter
+    def shift(self, shift: Shift) -> None:
+        self._shift = shift
+
+    @property
+    def to_rank(self) -> list[str]:
+        return self._to_rank
+
+    @property
+    def subjects(self) -> dict[str, Subject]:
+        return self._subjects
+
+    @subjects.setter
+    def subjects(
+        self,
+        type:    str,
+        subject: Subject = None
+    ) -> None:
+        self._subjects[type] = subject
+        if subject is not None:
+            self.sections(subject)
+            self.attends(subject)
+
+    @property
+    def categories(self) -> dict[str, Category]:
+        return self._categories
+
+    @categories.setter
+    def categories(
+        self,
+        type: str,
+        category: Category = None
+    ) -> None:
+        self._categories[type] = category
+        if category is not None:
+            self.sections(category)
+            self.attends(category)
+
+    @property
+    def sections(self) -> dict[Subject | Category, Section]:
+        return self._sections
+
+    @sections.setter
+    def sections(
+        self, 
+        parent: Subject | Category, 
+        section: Section = None
+    ) -> None:
+        self._sections[parent] = section
+        if self.shift is None:
+            self.shift = section.shift
+        else:
+            raise Exception()
+
+    @property
+    def groups(self) -> dict[Subject | Category, Group]:
+        return self._groups
+
+    @groups.setter
+    def groups(self, parent: Subject | Category, group: Group) -> None:
+        self._groups[parent] = group
+
+    @property
+    def prerequisites(self) -> set[Student]:
+        return self._prerequisites
+
+    @prerequisites.setter
+    def prerequisites(self, student: Student) -> None:
+        if student == self:
+            raise Exception()
+        elif student in self.not_alongside:
+            raise Exception()
+        else:
+            self._prerequisites.add(student)
+
+    @property
+    def not_alongside(self) -> set[Student]:
+        return self._not_alongside
+
+    @not_alongside.setter
+    def not_alongside(self, student: Student) -> None:
+        if student == self:
+            raise Exception()
+        elif student in self.prerequisites:
+            raise Exception()
+        else:
+            self._not_alongside.add(student)
+
+    @property
+    def attends(self) -> set[Subject | Category]:
+        return self._attends
+
+    @attends.setter
+    def attends(self, value: Subject | Category) -> None:
+        self._attends.add(value)
+        self.sections(value)
+
+    @property
+    def taken(self) -> set[Subject | Category]:
+        return self._previous.attends
+
+    @taken.setter
+    def taken(self, object: Subject | Category) -> None:
+        self._previous.attends(object)
+
+    @property
     def has_enlisted_level(self, level: int) -> bool:
         for type in self.to_rank:
-            for subject in self.irank[type]:
+            for subject in self.rankings.final.all(type):
                 if subject.level == level:
                     return True
         return False
 
+    @property
     def has_level(self, level: int) -> bool:
-        for subject in self.taken():
-            if subject.level == level:
+        for object in self.taken:
+            if object.level == level:
                 return True
-        for subject in self.subjects.values():
-            if isinstance(subject, Subject):
-                if subject.level == level:
-                    return True
+        for object in self.attends:
+            if object.level == level:
+                return True
         return False
 
-
-class Shift:
-    def __init__(
+    def propose(
         self,
-        name:       str      = None,
-        partitions: set[str] = set()
+        type:  str,
+        index: int = 0
     ) -> None:
-        self.name       = name
-        self.partitions = partitions
-    
-    def __repr__(self) -> str:
-        return ''.join(sorted(self.partitions)) if self.name is None else self.name
-
-    def add_partition(self, partition: str) -> None:
-        self.partitions.add(partition)
-
-
-class ParallelSession:
-    def __init__(
-        self,
-        shift: Shift,
-        partition: str,
-        index: int = int()
-    ) -> None:
-        self.shift = shift
-
-        self.partition = partition
-        assert self.partition in self.shift.partitions
-
-        self.index = index
-    
-    def __repr__(self) -> str:
-        return '{}{}'.format(
-            self.partition,
-            self.index
-                if self.index != int()
-                else ''
-        )
+        qualified, reason = self.rankings.final.get(type, index).students(self)
+        if not qualified:
+            self.rankings.final.reject(
+                self.rankings.final.get(type, index),
+                reason
+            )
+        else:
+            self.subjects(type, self.rankings.final.get(type, index))
+            self.attends(self.rankings.final.get(type, index))
 
 
 class Group:
@@ -327,127 +498,141 @@ class Group:
         students: set[Student]       = set(),
         required: bool               = bool()
     ) -> None:
+        self._students = students
+        self._required = required
+
         self.id       = id
         self.parent   = parent
-        self.students = students
-        self.required = required
-        '''Whether the students in this group must have the same shift'''
-    
-    def __repr__(self) -> str:
-        return self.id
-    
-    def add_student(self, student: Student) -> bool:
-        '''Adds a student. Returns whether the attempt is successful'''
-        if student not in self.students:
-            if self.parent.max_group_members > len(self.students):
-                if self.required:
-                    for member in self.students:
-                        if member.shift != student.shift:
-                            return False
-                self.students.add(student)
-                student.groups.add(self)
-                return True
-        return False
-
-
-class Rank:
-    def __init__(
-        self,
-        id:    str,
-        types: list[str]
-    ) -> None:
-        self.id    = 'RANK-{}'.format(id)
-        self.types = set(types)
-        '''Categories to rank'''
-        self.lst = dict(
-            (type, list[Subject]())
-                for type in self.types
-        )
-        '''Ranked subject preferences'''
-        self.set = dict(
-            (type, set[Subject]())
-                for type in self.types
-        )
-        self.rsn = dict(
-            (type, list[str]())
-                for type in types
-        )
-        '''Reason for not being accepted to a ranked subject'''
+        self.capacity = Capacity(0, 0, self.parent.max_group_members, len(students))
     
     def __repr__(self) -> str:
         return self.id
 
-    def add(
-        self,
-        type:    str,
-        subject: Subject
-    ) -> None:
-        '''Add a subject to the backmost of the ranking of a category'''
-        if subject not in self.set[type]:
-            self.lst[type].append(subject)
-            self.set[type].add(subject)
+    @property
+    def students(self) -> set[Student]:
+        return self._students
 
-    def get(
-        self,
-        type: str,
-        index: int
-    ) -> Subject:
-        return self.lst[type][index]
+    @students.setter
+    def students(self, student: Student) -> bool:
+        def ok_groupmates(student: Student):
+            for member in self.students:
+                if member.shift not in {None, student.shift}:
+                    return False
+            return True
 
-    def reject(
-        self,
-        type:    str,
-        subject: Subject,
-        reasons: list[str] = list()
-    ) -> None:
-        self.lst[type].remove(subject)
-        self.set[type].remove(subject)
-        self.rsn[type].extend(reasons)
-
-    def clear(self, type: str) -> None:
-        self.lst[type].clear()
-        self.set[type].clear()
+        if student in self.students:
+            return False
+        elif self.capacity.available <= 0:
+            return False
+        elif self.required and not ok_groupmates(student):
+            return False
+        else:
+            self._students.add(student)
+            self.capacity.accept(1)
+            student.groups(self.parent, self)
 
 
-class Category:
+class Subject:
     def __init__(
         self,
         name:              str,
-        capacity:          Capacity                       = Capacity(0, INF, INF, 0),
-        max_group_members: int                            = int(),
-        students:          set[Student]                   = set()
+        level:             int                 = None,
+        capacity:          Capacity            = Capacity(0, 0, 0),
+        repeatable:        bool                = bool(),
+        sections:          set[Section]             = set(),
+        prerequisites:     set[tuple[Subject | Category]] = set(),
+        not_alongside:     set[Subject | Category]        = set(),
+        max_group_members: int                 = int()
     ) -> None:
-        self.name              = name
-        self.capacity          = capacity
-        self.max_group_members = max_group_members
-        self.students          = students
+        self._name              = name
+        self._level             = level
+        self._repeatable        = repeatable
+        self._sections          = sections
+        self._prerequisites     = prerequisites
+        self._not_alongside     = not_alongside
+        self._max_group_members = max_group_members
+
+        self.capacity = capacity
     
     def __repr__(self) -> str:
-        return self.name
+        return '{}{}'.format(self.name, self.level)
 
-    def inspect_student(self, student: Student) -> tuple[bool, list[str]]:
-        ok_capacity = [
-            self.capacity.filled < self.capacity.maximum,
-            '{} does not meet requirements for {}'.format(student, self)
-        ]
+    @property
+    def name(self) -> str:
+        return self._name
 
-        qualifications = [
-            ok_capacity
-        ]
-        reasons        = [
-            item[1]
-                for item in qualifications
-                    if item[0] is True
-        ]
-        qualified      = all(
-            item[0]
-                for item in qualifications
-        )
-        return qualified, reasons
+    @property
+    def level(self) -> str:
+        if self._level is None:
+            return ''
+        else:
+            return str(self.level)
 
-    def add_student(self, student: Student) -> tuple[bool, list[str]]:
-        qualified, reasons = self.inspect_student(student)
-        if qualified:
-            self.students.add(student)
-            self.capacity.filled += 1
-        return qualified, reasons
+    @property
+    def repeatable(self) -> bool:
+        return self._repeatable
+
+    @property
+    def sections(self) -> set[Section]:
+        return self._sections
+
+    @sections.setter
+    def sections(self, section: Section) -> None:
+        '''Add a section'''
+        if section.parent != self:
+            raise Exception()
+        else:
+            self._sections.add(section)
+            self.capacity.increase(section.capacity)
+
+    @property
+    def prerequisites(self) -> set[tuple[Subject | Category]]:
+        return self._prerequisites
+
+    @prerequisites.setter
+    def prerequisites(self, objects: tuple[Subject | Category]) -> None:
+        if self in objects:
+            raise Exception()
+        elif len(set(objects).intersection(self.not_alongside)) > 0:
+            raise Exception()
+        else:
+            self._prerequisites.add(objects)
+
+    @property
+    def not_alongside(self) -> set[Subject | Category]:
+        return self._not_alongside
+
+    @not_alongside.setter
+    def not_alongside(self, object: Subject | Category) -> None:
+        if self == object:
+            raise Exception()
+        elif any(
+            object in prerequisite
+                for prerequisite in self.prerequisites
+        ):
+            raise Exception()
+        else:
+            self._not_alongside.add(object)
+
+    @property
+    def students(self) -> set[Student]:
+        return self._students
+
+    @students.setter
+    def students(self, student: Student) -> tuple[bool, str | None]:
+        def ok_prerequisites(student: Student) -> bool:
+            pass
+
+        if self.capacity.available <= 0:
+            return False, 'Full'
+        elif not ok_prerequisites(student):
+            return False, 'Prerequisites not met'
+        elif len(student.attends.intersection(self.not_alongside)) > 0:
+            return False, 'Incompatible with subject'
+        else:
+            for section in self.sections:
+                qualified, reason = section.students(student)
+                if qualified:
+                    self.capacity.accept(1)
+                    return True, None
+            return False, 'Incompatible with sections'
