@@ -109,9 +109,16 @@ class EncodeAgent:
                     if is_type:
                         subject.add_teaches(GRADE_LEVELS[grade_level])
                         if str(subject) not in self.subjects:
-                            self.subjects[str(subject)] = [[(GRADE_LEVELS[grade_level], ranked, type)], subject]
+                            self.subjects[str(subject)] = [
+                                [(GRADE_LEVELS[grade_level], ranked, type)], 
+                                subject
+                            ]
                         else:
-                            self.subjects[str(subject)][0].append((GRADE_LEVELS[grade_level], ranked, type))
+                            self.subjects[str(subject)][0].append((
+                                GRADE_LEVELS[grade_level], 
+                                ranked, 
+                                type
+                            ))
         
         data = self.xlsx(path, PREREQUISITES)
         for r in range(1, len(data)):
