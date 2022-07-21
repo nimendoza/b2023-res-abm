@@ -8,12 +8,16 @@ class Capacity:
         minimum: int,
         ideal:   int,
         maximum: int,
-        filled:  int = int()
+        filled:  int = None
     ) -> None:
         self.minimum = minimum
         self.ideal   = ideal
         self.maximum = maximum
-        self.filled  = filled
+
+        if filled is None:
+            self.filled = int()
+        else:
+            self.filled = filled
     
     def __repr__(self) -> str:
         return '{}/{}'.format(self.filled, self.maximum)
@@ -39,10 +43,14 @@ class Shift:
     def __init__(
         self,
         id:         str      = None,
-        partitions: set[str] = set()
+        partitions: set[str] = None
     ) -> None:
-        self._id         = id
-        self._partitions = partitions
+        self._id = id
+        
+        if partitions is None:
+            self._partitions = set()
+        else:
+            self._partitions = partitions
     
     def __repr__(self) -> str:
         return self.id
@@ -197,7 +205,7 @@ class Section:
         capacity:         Capacity,
         parent:           Subject | Category,
         name:             str                 = None,
-        students:         set[Student]        = set()
+        students:         set[Student]        = None
     ) -> None:
         self._shift            = shift
         self._parallel_session = parallel_session
@@ -205,7 +213,11 @@ class Section:
 
         self._name     = name
         self._parent   = parent
-        self._students = students
+
+        if students is None:
+            self._students = set()
+        else:
+            self._students = students
 
         self.capacity = capacity
     
@@ -232,7 +244,7 @@ class Section:
         return self._parent
 
     @property
-    def student(self) -> set[Student]:
+    def students(self) -> set[Student]:
         return self._students
 
     def add_student(self, student: Student) -> tuple[bool, str | None]:
@@ -271,18 +283,63 @@ class Category:
     def __init__(
         self,
         name:              str,
-        capacity:          Capacity     = Capacity(0, INF, INF),
-        max_group_members: int          = int(),
-        students:          set[Student] = set()
+        capacity:          Capacity                = None,
+        prerequisites:     set[Subject | Category] = None,
+        not_alongside:     set[Subject | Category] = None,
+        max_group_members: int                     = None,
+        students:          set[Student]            = None
     ) -> None:
         self._name              = name
-        self._max_group_members = max_group_members
-        self._students          = students
 
-        self.capacity = capacity
+        if max_group_members is None:
+            self._max_group_members = int()
+        else:
+            self._max_group_members = max_group_members
+        
+        if students is None:
+            self._students = set()
+        else:
+            self._students = students
+
+        if prerequisites is None:
+            self._prerequisites = set()
+        else:
+            self._prerequisites = prerequisites
+        
+        if not_alongside is None:
+            self._not_alongside = set()
+        else:
+            self._not_alongside = not_alongside
+
+        if capacity is None:
+            self.capacity = Capacity(0, INF, INF)
+        else:
+            self.capacity = capacity
     
     def __repr__(self) -> str:
         return self.name
+
+    @property
+    def prerequisites(self) -> set[tuple[Subject | Category]]:
+        return self._prerequisites
+
+    def add_prerequisites(self, objects: tuple[Subject | Category]) -> None:
+        if self in objects:
+            raise Exception()
+        elif len(set(objects).intersection(self.not_alongside)) > 0:
+            raise Exception()
+        else:
+            self._prerequisites.add(objects)
+
+    @property
+    def not_alongside(self) -> set[Subject | Category]:
+        return self._not_alongside
+
+    def add_not_alongside(self, object: Subject | Category) -> None:
+        if self == object:
+            raise Exception()
+        else:
+            self._not_alongside.add(object)
 
     @property
     def name(self) -> str:
@@ -298,13 +355,23 @@ class Category:
 
     def add_student(self, student: Student) -> tuple[bool, str | None]:
         '''Returns whether the student was added and any reason why the student wasn't added, if applicable'''
+        def ok_prerequisites(student: Student) -> bool:
+            for prerequisites in self.prerequsites:
+                if len(student.taken.intersection(set(prerequisites))) == 0:
+                    return False
+            return True
+
         if self.capacity.available <= 0:
-            return False, '{} has been filled'.format(self)
+            return False, 'Full'
+        elif not ok_prerequisites(student):
+            return False, 'Prerequisites not met'
+        elif len(student.attends.intersection(self.not_alongside)) > 0:
+            return False, 'Incompatible with subject'
         else:
             self._students.add(student)
             self.capacity.accept(1)
 
-            student.categories[str(self)] = self
+            student.add_category(str(self), self)
             return True, None
 
 
@@ -315,24 +382,49 @@ class Student:
         level:         int,
         to_rank:       list[str],
         shift:         Shift                                    = None,
-        subjects:      dict[str, Subject | None]                = dict(),
-        categories:    dict[str, Category | None]               = dict(),
-        sections:      dict[Subject | Category, Section | None] = dict(),
-        groups:        dict[Subject | Category, Group]          = dict(),
-        prerequisites: set[Student]                             = set(),
-        not_alongside: set[Student]                             = set(),
+        subjects:      dict[str, Subject | None]                = None,
+        categories:    dict[str, Category | None]               = None,
+        sections:      dict[Subject | Category, Section | None] = None,
+        groups:        dict[Subject | Category, Group]          = None,
+        prerequisites: set[Student]                             = None,
+        not_alongside: set[Student]                             = None,
         previous:      Student                                  = None
     ) -> None:
         self._id            = id
         self._level         = level
         self._shift         = shift
         self._to_rank       = to_rank
-        self._subjects      = subjects
-        self._categories    = categories
-        self._sections      = sections
-        self._groups        = groups
-        self._prerequisites = prerequisites
-        self._not_alongside = not_alongside
+
+        if subjects is None:
+            self._subjects = dict()
+        else:
+            self._subjects = subjects
+
+        if categories is None:
+            self._categories = dict()
+        else:
+            self._categories = categories
+
+        if sections is None:
+            self._sections = dict()
+        else:
+            self._sections = sections
+
+        if groups is None:
+            self._groups = dict()
+        else:
+            self._groups = groups
+
+        if prerequisites is None:
+            self._prerequisites = set()
+        else:
+            self._prerequisites = prerequisites
+
+        if not_alongside is None:
+            self._not_alongside = set()
+        else:
+            self._not_alongside = not_alongside
+
         self._previous      = previous
 
         self.rankings = Rankings(self.id, self.to_rank)
@@ -529,38 +621,67 @@ class Subject:
         self,
         name:              str,
         level:             int                            = None,
-        capacity:          Capacity                       = Capacity(0, 0, 0),
-        repeatable:        bool                           = bool(),
-        sections:          set[Section]                   = set(),
-        prerequisites:     set[tuple[Subject | Category]] = set(),
-        not_alongside:     set[Subject | Category]        = set(),
-        max_group_members: int                            = int(),
-        teaches:           set[int]                       = set()
+        capacity:          Capacity                       = None,
+        repeatable:        bool                           = None,
+        sections:          set[Section]                   = None,
+        prerequisites:     set[tuple[Subject | Category]] = None,
+        not_alongside:     set[Subject | Category]        = None,
+        max_group_members: int                            = None,
+        teaches:           set[int]                       = None
     ) -> None:
         self._name              = name
         self._level             = level
-        self._repeatable        = repeatable
-        self._sections          = sections
-        self._prerequisites     = prerequisites
-        self._not_alongside     = not_alongside
-        self._max_group_members = max_group_members
-        self._teaches           = teaches
 
-        self.capacity = capacity
+        if repeatable is None:
+            self._repeatable = bool()
+        else:
+            self._repeatable = repeatable
+
+        if sections is None:
+            self._sections = set()
+        else:
+            self._sections = sections
+
+        if prerequisites is None:
+            self._prerequisites = set()
+        else:
+            self._prerequisites = prerequisites
+
+        if not_alongside is None:
+            self._not_alongside = set()
+        else:
+            self._not_alongside = not_alongside
+
+        self._max_group_members = max_group_members
+
+        if teaches is None:
+            self._teaches = set()
+        else:
+            self._teaches = teaches
+
+        if capacity is None:
+            self.capacity = Capacity(0, 0, 0)
+        else:
+            self.capacity = capacity
     
     def __repr__(self) -> str:
-        return '{}{}'.format(self.name, self.level)
+        return '{}{}'.format(
+            self.name, 
+            ''
+                if self.level == int()
+                else ' Level {}'.format(self.level)
+        )
 
     @property
     def name(self) -> str:
         return self._name
 
     @property
-    def level(self) -> str:
+    def level(self) -> int:
         if self._level is None:
-            return ''
+            return int()
         else:
-            return str(self.level)
+            return self._level
 
     @property
     def repeatable(self) -> bool:
@@ -597,21 +718,15 @@ class Subject:
     def add_not_alongside(self, object: Subject | Category) -> None:
         if self == object:
             raise Exception()
-        elif any(
-            object in prerequisite
-                for prerequisite in self.prerequisites
-        ):
-            raise Exception()
         else:
             self._not_alongside.add(object)
 
-    @property
-    def student(self) -> set[Student]:
-        return self._students
-
     def add_student(self, student: Student) -> tuple[bool, str | None]:
         def ok_prerequisites(student: Student) -> bool:
-            pass
+            for prerequisites in self.prerequsites:
+                if len(student.taken.intersection(set(prerequisites))) == 0:
+                    return False
+            return True
 
         if self.capacity.available <= 0:
             return False, 'Full'
