@@ -655,6 +655,7 @@ class Category:
         prerequisites    : set[Subject | Category] = None,
         not_alongside    : set[Subject | Category] = None,
         max_group_members: int                     = None,
+        teaches          : set[GradeLevel]         = None,
         students         : set[Student]            = None
     ) -> None:
         self._name              = name
@@ -664,6 +665,7 @@ class Category:
         self._prerequisites     = prerequisites or set()
         self._not_alongside     = not_alongside or set()
         self._max_group_members = max_group_members or int()
+        self._teaches           = teaches or set()
         self._students          = students or set()
     
     def __repr__(self) -> str:
@@ -696,6 +698,10 @@ class Category:
     @property
     def max_group_members(self) -> int:
         return self._max_group_members
+
+    @property
+    def teaches(self) -> set[GradeLevel]:
+        return self._teaches
 
     @property
     def students(self) -> set[Student]:
@@ -750,6 +756,9 @@ class Category:
             except Exception:
                 ...
 
+    def add_taught(self, grade_level: GradeLevel) -> None:
+        self.teaches.add(grade_level)
+
     def ok_student(self, student: Student) -> bool:
         for prerequisites in self.prerequisites:
             if not student.taken.intersection(set(prerequisites)):
@@ -780,12 +789,12 @@ class Subject(Category):
             prerequisites,
             not_alongside,
             max_group_members,
+            teaches,
             students
         )
 
-        self._level = level
+        self._level      = level
         self._repeatable = repeatable or bool()
-        self._teaches = teaches or set()
     
     def __repr__(self) -> str:
         return '{}{}'.format(
@@ -802,10 +811,6 @@ class Subject(Category):
     @property
     def repeatable(self) -> bool:
         return self._repeatable
-
-    @property
-    def teaches(self) -> set[GradeLevel]:
-        return self._teaches
 
     def add_student(self, student: Student) -> tuple[bool, str | None]:
         if self.capacity.available <= 0:
@@ -826,6 +831,3 @@ class Subject(Category):
                     except Exception:
                         ...
             return False, 'Incompatible with sections'
-
-    def add_taught(self, grade_level: GradeLevel) -> None:
-        self.teaches.add(grade_level)
