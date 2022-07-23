@@ -272,6 +272,10 @@ class GradeLevel:
         return self.name
 
     @property
+    def name(self) -> str:
+        return f'Grade {self.grade_level}'
+
+    @property
     def grade_level(self) -> int:
         return self._grade_level
 
@@ -285,7 +289,7 @@ class GradeLevel:
 
     @property
     def subject_types(self) -> set[str]:
-        return self.subject_types
+        return self._subject_types
 
     
 class Student:
@@ -649,7 +653,7 @@ class Category:
     def __init__(
         self,
         name             : str,
-        type             : str,
+        types            : set[str]                = None,
         capacity         : Capacity                = None,
         sections         : set[Section]            = None,
         prerequisites    : set[Subject | Category] = None,
@@ -659,7 +663,7 @@ class Category:
         students         : set[Student]            = None
     ) -> None:
         self._name              = name
-        self._type              = type
+        self._types             = types or set()
         self._capacity          = capacity or Capacity(0, 0, INF, 0)
         self._sections          = sections
         self._prerequisites     = prerequisites or set()
@@ -676,8 +680,8 @@ class Category:
         return self._name
 
     @property
-    def type(self) -> str:
-        return self._type
+    def types(self) -> set[str]:
+        return self._types
 
     @property
     def capacity(self) -> Capacity:
@@ -742,7 +746,7 @@ class Category:
                     self.students.add(student)
                     self.capacity.filled += 1
                     try:
-                        student.add_category(self.type, self)
+                        student.add_category(self.types, self)
                         return True, None
                     except Exception:
                         ...
@@ -751,13 +755,10 @@ class Category:
             self.students.add(student)
             self.capacity.filled += 1
             try:
-                student.add_category(self.type, self)
+                student.add_category(self.types, self)
                 return True, None
             except Exception:
                 ...
-
-    def add_taught(self, grade_level: GradeLevel) -> None:
-        self.teaches.add(grade_level)
 
     def ok_student(self, student: Student) -> bool:
         for prerequisites in self.prerequisites:
@@ -770,7 +771,7 @@ class Subject(Category):
     def __init__(
         self,
         name             : str,
-        type             : str,
+        types            : set[str],
         level            : int                     = None,
         repeatable       : bool                    = None,
         capacity         : Capacity                = None,
@@ -783,7 +784,7 @@ class Subject(Category):
     ) -> None:
         super(Subject, self).__init__(
             name,
-            type,
+            types,
             capacity,
             sections,
             prerequisites,
@@ -799,7 +800,7 @@ class Subject(Category):
     def __repr__(self) -> str:
         return '{}{}'.format(
             self.name,
-            f' Level{self.level}'
+            f' Level {self.level}'
                 if self.level
                 else ''
         )
@@ -826,7 +827,7 @@ class Subject(Category):
                     self.students.add(student)
                     self.capacity.filled += 1
                     try:
-                        student.add_subject(self.type, self)
+                        student.add_subject(self.types, self)
                         return True, None
                     except Exception:
                         ...
