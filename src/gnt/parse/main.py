@@ -8,11 +8,12 @@ class ParseAgent:
         subjects_encoded = False
 
         def encode_subjects() -> None:
+            nonlocal subjects_encoded
             with open(PATHS[SUBJECT_DESC], 'r') as file:
                 for line in file.readlines():
                     print(line, end='')
             subject_path = input('Subject data file path: ')
-            encode_agent.subjects(subject_path)
+            encode_agent.encode_subjects(subject_path)
             subjects_encoded = True
 
         def check_subjects() -> None:
@@ -32,6 +33,9 @@ class ParseAgent:
                 #  TODO: Complete this
                 raise NotImplementedError()
 
+        def read() -> None:
+            check_subjects()
+
         def main() -> None:
             with open(PATHS[REQUEST], 'r') as file:
                 for line in file.readlines():
@@ -40,6 +44,8 @@ class ParseAgent:
                 case 'GENERATE':
                     #  TODO: Complete this
                     raise NotImplementedError()
+                case 'READ':
+                    read()
                 case 'VALIDATE':
                     validate()
 
@@ -52,4 +58,6 @@ class ParseAgent:
 if __name__ == '__main__':
     parse_agent = ParseAgent()
     if TERMINAL:
-        parse_agent.terminal()
+        encode_agent.encode_subjects('input\\Test data_ Subjects.xlsx')
+        encode_agent.encode_students('input\\Test data_ Students.xlsx')
+        print('mlem')  # Just for breakpoint purposes
