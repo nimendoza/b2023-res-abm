@@ -1,57 +1,74 @@
 from src.gnt.encode.constants import *
 
+from src.cls.main import GradeLevel
 from src.cls.main import Subject
 from src.cls.main import Category
+from src.cls.main import Student
+from src.cls.main import Group
 from src.cls.main import Shift
 from src.cls.main import Section
 from src.cls.main import ParallelSession
 from src.cls.main import Capacity
-from openpyxl import load_workbook
+from openpyxl     import load_workbook
+from src.gnt.write.main import writer_agent
+
 
 class EncodeAgent:
     def __init__(self) -> None:
-        self.subjects   = dict[str, list[list[tuple[int, bool, str]] | Subject]]()
-        self.categories = dict[str, Category]()
-        self.shifts     = dict[str, Shift]()
+        self._grade_levels = dict[str, GradeLevel]()
+        self._subjects     = dict[str, list[set[tuple[GradeLevel, bool, str]] | Subject]]()
+        self._categories   = dict[str, list[set[tuple[GradeLevel, str]] | Category]]()
+        self._students     = dict[GradeLevel, list[Student]]()
+        self._groups       = dict[GradeLevel, dict[str, Group]]()
+        self._shifts       = dict[str, Shift]()
 
-        self.sorted_subjects = dict[int, dict[bool, dict[str, list[Subject]]]]()
+    def __sort__(self) -> None:
+        ...
 
-    def reset(self, grade_level: int = None) -> None:
-        if grade_level is None:
-            self.subjects.clear()
-            self.categories.clear()
-        else:
-            self.subjects[grade_level].clear()
-            self.categories[grade_level].clear()
-        self.sorted_subjects.clear()
-        self.shifts.clear()
+    def __reset__(self) -> None:
+        ...
 
-    def sort(self) -> None:
-        for data, subject in self.subjects.values():
-            grade_level, ranked, type = data
-            if grade_level not in self.sorted_subjects:
-                self.sorted_subjects[grade_level] = dict[bool, dict[str, list[Subject]]]()
-            if ranked not in self.sorted_subjects[grade_level]:
-                self.sorted_subjects[grade_level][ranked] = dict[str, list[Subject]]()
-            if type not in self.sorted_subjects[grade_level][ranked]:
-                self.sorted_subjects[grade_level][ranked][type] = list[Subject]()
-            self.sorted_subjects[grade_level][ranked][type].append(subject)
-        
+    def __reset_students__(self) -> None:
+        ...
+
+    @property
+    def grade_levels(self) -> dict[str, GradeLevel]:
+        return self._grade_levels
+
+    @property
+    def subjects(self) -> dict[str, list[set[tuple[GradeLevel, bool, str]] | Subject]]:
+        return self._subjects
+
+    @property
+    def categories(self) -> dict[str, list[set[tuple[GradeLevel, str]] | Category]]:
+        return self._categories
+
+    @property
+    def students(self) -> dict[GradeLevel, list[Student]]:
+        return self._students
+
+    @property
+    def groups(self) -> dict[GradeLevel, dict[str, Group]]:
+        return self._groups
+
+    @property
+    def shifts(self) -> dict[str, Shift]:
+        return self._shifts
+
     def xlsx(
         self,
-        path:  str,
+        path: str,
         sheet: str
-    ) -> list[list[str]]:
-        workbook  = load_workbook(
-            filename=path,
-            data_only=True
-        )
+    ) -> list[list[str | None]]:
+        workbook = load_workbook(filename=path, data_only=True)
         worksheet = workbook[sheet]
-        data      = list()
+        data = list()
         for row in worksheet.rows:
             line = list()
             for cell in row:
-                if isinstance(cell.value, float):
+                if cell.value is None:
+                    line.append(cell.value)
+                elif isinstance(cell.value, float):
                     line.append(str(int(cell.value)))
                 else:
                     line.append(str(cell.value))
@@ -65,69 +82,114 @@ class EncodeAgent:
 
     def find(self, name: str) -> Subject | Category:
         if name in self.categories:
-            return self.categories[name]
+            return self.categories[name][1]
         else:
-            return self.subjects[name][1]
+            if name in self.subjects:
+                return self.subjects[name][1]
+            else:
+                for data, subject in self.subjects.values():
+                    if str(subject) == name:
+                        return subject
 
-    def encode_subjects(self, path: str, reset: bool = True) -> None:
+    def encode_subjects(
+        self,
+        path: str,
+        reset: bool = None
+    ) -> None:
         if reset:
-            self.reset()
-
+            self.__reset__()
+        
+        for sheet in writer_agent.get_sheetnames(path):
+            if sheet.find(GRADE_LEVEL) != -1:
+                data = self.xlsx(path, sheet)
+                grade_level = int(data[0][1])
+                self.grade_levels[str(grade_level)] = GradeLevel(
+                    grade_level=grade_level,
+                    to_rank=set(data[7][c] for c in range(3, 3 + int(data[7][2]))),
+                    category_types=set(data[4][c] for c in range(3, 3 + int(data[4][2]))),
+                    subject_types=set(data[3][c] for c in range(3, 3 + int(data[3][2])))
+                )
+        
         data = self.xlsx(path, SHIFTS)
         for r in range(1, len(data)):
             name  = data[r][0]
             shift = Shift(name)
             for c in range(2, 2 + int(data[r][1])):
-                shift.add_partition(data[r][c])
+                shift.add(data[r][c])
             self.shifts[name] = shift
 
         data = self.xlsx(path, CLASSIFICATION)
         for r in range(2, len(data)):
-            name              = data[r][0]
+            name = data[r][0]
+            level = None if not data[r][1].isdigit() else int(data[r][1])
             max_group_members = None if not data[r][2].isdigit() else int(data[r][2])
-            if data[r][3].upper() == 'Y':
-                category = Category(
-                    name=name,
-                    max_group_members=max_group_members
-                )
-                self.categories[name] = category
-            else:
-                level   = None if not data[r][1].isdigit() else int(data[r][1])
-                subject = Subject(
-                    name=name,
-                    level=level,
-                    max_group_members=max_group_members
-                )
-                for c in range(4, len(data[r]), 3):
-                    grade_level = data[1][c]
-                    ranked      = data[1][c + 1].upper() == 'Y'
-                    type        = data[1][c + 2]
-                    is_type     = any(
-                        item.upper() == 'Y'
-                            for item in data[r][c:c + 3]
-                    )
-                    if is_type:
-                        subject.add_teaches(GRADE_LEVELS[grade_level])
-                        if str(subject) not in self.subjects:
-                            self.subjects[str(subject)] = [
-                                [(GRADE_LEVELS[grade_level], ranked, type)], 
-                                subject
-                            ]
+            
+            c = 3
+            while data[1][c] == CATEGORY:
+                grade_level = self.grade_levels[data[1][c + 1]]
+                type        = data[1][c + 2]
+                if any(cell.upper() == YES for cell in data[r][c:c + 3] if cell):
+                    if name not in self.categories:
+                        category = Category(
+                            name=name,
+                            types={type},
+                            teaches={grade_level}
+                        )
+                        self.categories[name] = [{(grade_level, type)}, category]
+                    else:
+                        self.categories[name][0].add((grade_level, type))
+                        self.categories[name][1].teaches.add(grade_level)
+                        self.categories[name][1].types.add(type)
+                    grade_level.category_types.add(type)
+                c += 3
+            while c < len(data[1]) and data[1][c] == SUBJECT:
+                grade_level = self.grade_levels[data[1][c + 1]]
+                ranked = data[1][c + 2].upper() == YES
+                type = data[1][c + 3]
+                if any(cell.upper() == YES for cell in data[r][c:c + 4] if cell):
+                    if name not in self.subjects:
+                        subject = Subject(
+                            name=name,
+                            types={type},
+                            level=level,
+                            max_group_members=max_group_members,
+                            teaches={grade_level}
+                        )
+                        self.subjects[name] = [{(grade_level, ranked, type)}, subject]
+                    else:
+                        subject_ = Subject(name=name, level=level, types={})
+                        if str(self.subjects[name][1]) == str(subject_):
+                            self.subjects[name][0].add((grade_level, ranked, type))
+                            self.subjects[name][1].teaches.add(grade_level)
+                            self.subjects[name][1].types.add(type)
                         else:
-                            self.subjects[str(subject)][0].append((
-                                GRADE_LEVELS[grade_level], 
-                                ranked, 
-                                type
-                            ))
-        
+                            name_ = str(subject_)
+                            if name_ not in self.subjects:
+                                subject_ = Subject(
+                                    name=name,
+                                    types={type},
+                                    level=level,
+                                    max_group_members=max_group_members,
+                                    teaches={grade_level}
+                                )
+                                self.subjects[str(subject_)] = [
+                                    {(grade_level, ranked, type)},
+                                    subject_
+                                ]
+                            else:
+                                self.subjects[name_][0].add((grade_level, ranked, type))
+                                self.subjects[name_][1].teaches.add(grade_level)
+                                self.subjects[name_][1].types.add(type)
+                    grade_level.subject_types.add(type)
+                    if ranked:
+                        grade_level.to_rank.add(type)
+                c += 4
+
         data = self.xlsx(path, PREREQUISITES)
         for r in range(1, len(data)):
             object = self.find(data[r][0])
             for c in range(2, 2 + int(data[r][1])):
-                prerequisite = tuple(
-                    self.find(name)
-                        for name in data[r][c].split(DELIMITER)
-                )
+                prerequisite = tuple(self.find(name) for name in data[r][c].split(DELIMITER))
                 object.add_prerequisites(prerequisite)
 
         data = self.xlsx(path, NOT_ALONGSIDE)
@@ -157,8 +219,6 @@ class EncodeAgent:
                     ),
                     parent=object
                 ))
-
-        self.sort()
 
 
 encode_agent = EncodeAgent()
