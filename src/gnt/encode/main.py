@@ -1,15 +1,15 @@
 from src.gnt.encode.constants import *
 
-from src.cls.main import GradeLevel
-from src.cls.main import Subject
-from src.cls.main import Category
-from src.cls.main import Student
-from src.cls.main import Group
-from src.cls.main import Shift
-from src.cls.main import Section
-from src.cls.main import ParallelSession
-from src.cls.main import Capacity
-from openpyxl     import load_workbook
+from src.cls.main       import GradeLevel
+from src.cls.main       import Subject
+from src.cls.main       import Category
+from src.cls.main       import Student
+from src.cls.main       import Group
+from src.cls.main       import Shift
+from src.cls.main       import Section
+from src.cls.main       import ParallelSession
+from src.cls.main       import Capacity
+from openpyxl           import load_workbook
 from src.gnt.write.main import writer_agent
 
 
@@ -19,7 +19,7 @@ class EncodeAgent:
         self._subjects     = dict[str, list[set[tuple[GradeLevel, bool, str]] | Subject]]()
         self._categories   = dict[str, list[set[tuple[GradeLevel, str]] | Category]]()
         self._students     = dict[GradeLevel, list[Student]]()
-        self._groups       = dict[GradeLevel, dict[str, Group]]()
+        self._groups       = dict[GradeLevel, dict[Subject | Category, dict[str, Group]]]()
         self._shifts       = dict[str, Shift]()
 
     def __sort__(self) -> None:
@@ -48,7 +48,7 @@ class EncodeAgent:
         return self._students
 
     @property
-    def groups(self) -> dict[GradeLevel, dict[str, Group]]:
+    def groups(self) -> dict[GradeLevel, dict[Subject | Category, dict[str, Group]]]:
         return self._groups
 
     @property
@@ -57,12 +57,12 @@ class EncodeAgent:
 
     def xlsx(
         self,
-        path: str,
+        path : str,
         sheet: str
     ) -> list[list[str | None]]:
-        workbook = load_workbook(filename=path, data_only=True)
+        workbook  = load_workbook(filename=path, data_only=True)
         worksheet = workbook[sheet]
-        data = list()
+        data      = list()
         for row in worksheet.rows:
             line = list()
             for cell in row:
@@ -93,7 +93,7 @@ class EncodeAgent:
 
     def encode_subjects(
         self,
-        path: str,
+        path : str,
         reset: bool = None
     ) -> None:
         if reset:
@@ -101,7 +101,7 @@ class EncodeAgent:
         
         for sheet in writer_agent.get_sheetnames(path):
             if sheet.find(GRADE_LEVEL) != -1:
-                data = self.xlsx(path, sheet)
+                data        = self.xlsx(path, sheet)
                 grade_level = int(data[0][1])
                 self.grade_levels[str(grade_level)] = GradeLevel(
                     grade_level=grade_level,
@@ -120,7 +120,7 @@ class EncodeAgent:
 
         data = self.xlsx(path, CLASSIFICATION)
         for r in range(2, len(data)):
-            name = data[r][0]
+            name  = data[r][0]
             level = None if not data[r][1].isdigit() else int(data[r][1])
             max_group_members = None if not data[r][2].isdigit() else int(data[r][2])
             
@@ -219,6 +219,73 @@ class EncodeAgent:
                     ),
                     parent=object
                 ))
+
+    def encode_students(
+        self,
+        path : str,
+        reset: bool = None
+    ) -> None:
+        if reset:
+            self.__reset_students__()
+
+        # Groups need to be processed first
+        for sheet in writer_agent.get_sheetnames(path):
+            if sheet.find(GROUPS) != -1:
+                data   = self.xlsx(path, sheet)
+                parent = self.find(data[0][1])
+                for grade_level in parent.teaches:
+                    if grade_level not in self.groups:
+                        self.groups[grade_level] = dict[Subject | Category, dict[str, Group]]()
+                if parent not in self.groups[grade_level]:
+                    self.groups[grade_level][parent] = dict[str, Group]()
+                for r in range(2, len(data)):
+                    id = data[r][0]
+                    group = Group(
+                        id=id,
+                        parent=parent,
+                        required=data[r][1].upper() == YES
+                    )
+                    self.groups[grade_level][parent][id] = group
+        for sheet in writer_agent.get_sheetnames(path):
+            if sheet.find(GRADE_LEVEL) != -1:
+                data = self.xlsx(path, sheet)
+                for r in range(2, len(data)):
+                    grade_level = self.grade_levels[data[r][0]]
+                    if grade_level not in self.students:
+                        self.students[grade_level] = list[Student]()
+
+                    id      = data[r][1]
+                    student = Student(id=id, grade_level=grade_level)
+
+                    c = 2
+                    while data[0][c].upper() == GROUP.upper():
+                        parent = self.find(data[1][c])
+                        id_    = data[r][c]
+                        if id_ in self.groups[grade_level][parent]:
+                            self.groups[grade_level][parent][id_].add_student(student)
+                        c += 1
+                    while data[0][c].upper() == PREVIOUS_YEAR.upper():
+                        if student.previous is None:
+                            student_ = Student(
+                                id=id, 
+                                grade_level=self.grade_levels[str(grade_level.grade_level - 1)]
+                            )
+                            student.previous = student_
+                        student.previous.attends.add(self.find(data[r][c]))
+                        c += 1
+                    for c_ in range(c, len(data[r])):
+                        type = data[1][c_]
+                        if data[r][c_] is None:
+                            continue
+                        object = self.find(data[r][c_])
+                        if type in grade_level.to_rank:
+                            student.rankings.add(type, object)
+                        else:
+                            if isinstance(object, Subject):
+                                student.add_subject(type, object)
+                            else:
+                                student.add_category(type, object)
+                    self.students[grade_level].append(student)
 
 
 encode_agent = EncodeAgent()

@@ -12,5 +12,6 @@ SUBJECT  = 'Subject'
 YES = 'Y'
 
 PREVIOUS_YEAR = 'Previous year'
+GROUP         = 'Group'
 
 DELIMITER = '||'
