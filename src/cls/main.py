@@ -190,7 +190,8 @@ class Rank:
         subject: Subject
     ) -> None:
         if subject in self.present[type]:
-            raise Exception()
+            # TODO: raise Exception()
+            return
         else:
             self._ordered[type].append(subject)
             self._present[type].add(subject)
@@ -316,7 +317,7 @@ class Student:
         self._rankings   = Rankings(self.id, self.grade_level.to_rank)
         self._categories = dict[str, Category | None](
             (type, None) 
-                for type in self.grade_level.categry_types
+                for type in self.grade_level.category_types
         )
         self._subjects   = dict[str, Subject | None](
             (type, None)
@@ -383,7 +384,7 @@ class Student:
 
     @property
     def subjects(self) -> dict[str, Subject | None]:
-        return self.subjects
+        return self._subjects
 
     @property
     def taken(self) -> set[Subject | Category] | None:
@@ -395,11 +396,11 @@ class Student:
         type   : str,
         subject: Subject
     ) -> None:
-        if type not in self.grade_level.category_types:
+        if type not in self.grade_level.subject_types:
             raise Exception()
         elif self.subjects[type] is not None:
             raise Exception()
-        elif subject.add_student[0]:
+        elif subject.add_student(self)[0]:
             self.subjects[type] = subject
             self.add_section(subject)
             self.attends.add(subject)
@@ -409,7 +410,7 @@ class Student:
         type    : str,
         category: Category
     ) -> None:
-        if type not in self.grade_level.subject_types:
+        if type not in self.grade_level.category_types:
             raise Exception()
         elif self.categories[type] is not None:
             raise Exception()
@@ -459,9 +460,7 @@ class Student:
         parent: Subject | Category,
         group : Group
     ) -> None:
-        if parent not in self.attends:
-            raise Exception()
-        elif any(
+        if any(
             groupmate.shift not in {None, self.shift}
                 for groupmate in group.students
         ):
@@ -665,7 +664,7 @@ class Category:
         self._name              = name
         self._types             = types or set()
         self._capacity          = capacity or Capacity(0, 0, INF, 0)
-        self._sections          = sections
+        self._sections          = sections or set()
         self._prerequisites     = prerequisites or set()
         self._not_alongside     = not_alongside or set()
         self._max_group_members = max_group_members or int()
